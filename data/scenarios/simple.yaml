@@ -1,0 +1,14 @@
+name: simple
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.baseline:SmallestStorageFirstOutbound"
+  args: {}
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 60
+  outbound_per_card_sec: 2

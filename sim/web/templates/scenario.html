@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}{{ dataset }} / {{ scenario_name }} — 倉庫シミュレーター{% endblock %}
+
+{% block content %}
+<p style="color:#666;margin-bottom:8px">
+  <a href="/dataset/{{ dataset }}">{{ dataset }}</a> &rsaquo; {{ scenario_name }}
+</p>
+<h1>シナリオ: {{ scenario_name }}</h1>
+
+{% if summary %}
+<div class="grid2">
+  <div class="card">
+    <h2>総工数（秒）推移</h2>
+    <canvas id="costChart" width="560" height="260"></canvas>
+  </div>
+  <div class="card">
+    <h2>あたり率推移</h2>
+    <canvas id="hitChart" width="560" height="260"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h2>日次サマリ</h2>
+  <div style="overflow-x:auto">
+  <table>
+    <thead>
+      <tr>{% for h in summary_headers %}<th>{{ h }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in summary_rows %}
+      <tr>
+        {% for cell in row %}
+        <td>
+          {% if summary_headers[loop.index0] == 'hit_rate' and cell != '' %}
+            {{ "%.1f"|format(cell|float * 100) }}%
+          {% else %}
+            {{ cell }}
+          {% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<div class="card">
+  <h2>作業明細（最大200件）</h2>
+  <div style="overflow-x:auto">
+  <table>
+    <thead>
+      <tr>{% for h in detail_headers %}<th>{{ h }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in detail_rows %}
+      <tr>
+        {% for cell in row %}
+        <td>
+          {% if loop.index0 == 1 %}
+            {% if cell == 'inbound' %}<span class="badge badge-blue">入庫</span>
+            {% elif cell == 'outbound' %}<span class="badge badge-green">出庫</span>
+            {% elif cell == 'stocktake' %}<span class="badge badge-orange">棚卸し</span>
+            {% else %}{{ cell }}{% endif %}
+          {% else %}{{ cell }}{% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% else %}
+<div class="card"><p>出力ファイルが見つかりません。シミュレーションを実行してください。</p></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if summary %}
+<script>
+const summaryData = {{ summary | tojson }};
+const labels = summaryData.map(d => d.date);
+
+SimpleChart.draw('costChart', labels, [
+  { label: '入庫', data: summaryData.map(d => d.inbound_cost_sec) },
+  { label: '出庫', data: summaryData.map(d => d.outbound_cost_sec) },
+  { label: '棚卸し', data: summaryData.map(d => d.stocktake_cost_sec) },
+], { minY: 0 });
+
+SimpleChart.draw('hitChart', labels, [
+  { label: 'あたり率', data: summaryData.map(d => d.hit_rate != null ? +(d.hit_rate * 100).toFixed(2) : null), color: '#00838f' },
+], { minY: 0, decimals: 1, suffix: '%' });
+</script>
+{% endif %}
+{% endblock %}

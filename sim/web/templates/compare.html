@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}シナリオ比較 — 倉庫シミュレーター{% endblock %}
+
+{% block content %}
+<h1>シナリオ比較</h1>
+
+<div class="card" style="margin-bottom:16px">
+  <form method="get">
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+      <div>
+        <div style="font-weight:600;margin-bottom:6px">データセット</div>
+        <select name="dataset" onchange="this.form.submit()" style="padding:5px 10px;border:1px solid #ccc;border-radius:4px;font-size:14px">
+          {% for ds in datasets %}
+          <option value="{{ ds }}" {% if ds == current_dataset %}selected{% endif %}>{{ ds }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if ran_scenarios %}
+      <div>
+        <div style="font-weight:600;margin-bottom:6px">比較するシナリオ</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          {% for s in ran_scenarios %}
+          <label style="display:flex;gap:4px;align-items:center;cursor:pointer">
+            <input type="checkbox" name="s" value="{{ s }}"
+                   {% if s in selected %}checked{% endif %}>
+            {{ s }}
+          </label>
+          {% endfor %}
+          <button type="submit" class="btn">比較</button>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+{% if not current_dataset %}
+<div class="card"><p>データセットを選択してください。</p></div>
+{% elif not ran_scenarios %}
+<div class="card"><p>このデータセットにはまだ実行済みのシナリオがありません。</p></div>
+{% elif selected %}
+
+<div class="grid2">
+  <div class="card">
+    <h2>総工数（秒）比較</h2>
+    <canvas id="costChart" width="560" height="280"></canvas>
+  </div>
+  <div class="card">
+    <h2>あたり率比較</h2>
+    <canvas id="hitChart" width="560" height="280"></canvas>
+  </div>
+</div>
+
+<div class="card">
+  <h2>集計サマリ（データセット: {{ current_dataset }}）</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>シナリオ</th>
+        <th>総工数（秒）</th>
+        <th>入庫コスト計</th>
+        <th>出庫コスト計</th>
+        <th>棚卸しコスト計</th>
+        <th>平均あたり率</th>
+        <th>入庫総数</th>
+        <th>出庫総数</th>
+      </tr>
+    </thead>
+    <tbody id="summaryTable"></tbody>
+  </table>
+</div>
+
+{% else %}
+<div class="card"><p>シナリオを選択してください。</p></div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if selected %}
+<script>
+const allSummaries = {{ summaries_json }};
+const selectedNames = {{ selected | tojson }};
+
+const allDates = new Set();
+for (const name of selectedNames) {
+  (allSummaries[name] || []).forEach(d => allDates.add(d.date));
+}
+const labels = Array.from(allDates).sort();
+
+const costDatasets = selectedNames.map(name => {
+  const data = allSummaries[name] || [];
+  const byDate = Object.fromEntries(data.map(d => [d.date, d.total_cost_sec]));
+  return { label: name, data: labels.map(l => byDate[l] ?? null) };
+});
+SimpleChart.draw('costChart', labels, costDatasets, { minY: 0 });
+
+const hitDatasets = selectedNames.map(name => {
+  const data = allSummaries[name] || [];
+  const byDate = Object.fromEntries(data.map(d => [d.date, d.hit_rate != null ? +(d.hit_rate * 100).toFixed(2) : null]));
+  return { label: name, data: labels.map(l => byDate[l] ?? null) };
+});
+SimpleChart.draw('hitChart', labels, hitDatasets, { minY: 0, decimals: 1, suffix: '%' });
+
+const tbody = document.getElementById('summaryTable');
+for (const name of selectedNames) {
+  const data = allSummaries[name] || [];
+  if (!data.length) continue;
+  const totalCost = data.reduce((s, d) => s + d.total_cost_sec, 0);
+  const inboundCost = data.reduce((s, d) => s + d.inbound_cost_sec, 0);
+  const outboundCost = data.reduce((s, d) => s + d.outbound_cost_sec, 0);
+  const stocktakeCost = data.reduce((s, d) => s + d.stocktake_cost_sec, 0);
+  const hitRates = data.filter(d => d.hit_rate != null).map(d => d.hit_rate);
+  const avgHit = hitRates.length ? hitRates.reduce((s, v) => s + v, 0) / hitRates.length : null;
+  const inboundCount = data.reduce((s, d) => s + d.inbound_count, 0);
+  const outboundCount = data.reduce((s, d) => s + d.outbound_count, 0);
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><strong>${name}</strong></td>
+    <td>${totalCost.toFixed(0)}</td>
+    <td>${inboundCost.toFixed(0)}</td>
+    <td>${outboundCost.toFixed(0)}</td>
+    <td>${stocktakeCost.toFixed(0)}</td>
+    <td>${avgHit != null ? (avgHit * 100).toFixed(1) + '%' : '—'}</td>
+    <td>${inboundCount}</td>
+    <td>${outboundCount}</td>
+  `;
+  tbody.appendChild(tr);
+}
+</script>
+{% endif %}
+{% endblock %}

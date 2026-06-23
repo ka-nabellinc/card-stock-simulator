@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ dataset }} — 倉庫シミュレーター{% endblock %}
+
+{% block content %}
+<h1>データセット: {{ dataset }}</h1>
+
+<div class="grid2">
+  <div class="card">
+    <h2>入力データ</h2>
+    <table>
+      <thead><tr><th>ファイル</th><th></th></tr></thead>
+      <tbody>
+        <tr><td>storages.csv</td><td><a href="/dataset/{{ dataset }}/input/storages.csv" class="btn">表示</a></td></tr>
+        <tr><td>inbound.csv</td><td><a href="/dataset/{{ dataset }}/input/inbound.csv" class="btn">表示</a></td></tr>
+        <tr><td>initial_stock.csv</td><td><a href="/dataset/{{ dataset }}/input/initial_stock.csv" class="btn">表示</a></td></tr>
+        <tr><td>orders.csv</td><td><a href="/dataset/{{ dataset }}/input/orders.csv" class="btn">表示</a></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>シナリオと実行状況</h2>
+    <table>
+      <thead><tr><th>シナリオ</th><th>状態</th><th></th></tr></thead>
+      <tbody>
+      {% for s in scenarios %}
+      <tr>
+        <td>{{ s }}</td>
+        <td>
+          {% if s in ran_scenarios %}
+            <span class="badge badge-green">実行済み</span>
+          {% else %}
+            <span style="color:#999;font-size:12px">未実行</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if s in ran_scenarios %}
+            <a href="/dataset/{{ dataset }}/scenario/{{ s }}" class="btn">結果</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if ran_scenarios|length > 1 %}
+    <br>
+    <a href="/compare?dataset={{ dataset }}" class="btn">このデータセットで比較</a>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

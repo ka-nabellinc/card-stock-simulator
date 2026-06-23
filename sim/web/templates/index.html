@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}ホーム — 倉庫シミュレーター{% endblock %}
+
+{% block content %}
+<h1>倉庫シミュレーター</h1>
+
+<div class="grid2">
+  <div class="card">
+    <h2>データセット一覧</h2>
+    {% if datasets %}
+    <table>
+      <thead><tr><th>データセット</th><th>実行済みシナリオ数</th><th></th></tr></thead>
+      <tbody>
+      {% for ds in datasets %}
+      <tr>
+        <td><strong>{{ ds }}</strong></td>
+        <td>{{ all_results.get(ds, [])|length }} 件</td>
+        <td><a href="/dataset/{{ ds }}" class="btn">詳細</a></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#999">データセットが見つかりません（data/datasets/）</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>シナリオ一覧</h2>
+    {% if scenarios %}
+    <table>
+      <thead><tr><th>シナリオ名</th></tr></thead>
+      <tbody>
+      {% for s in scenarios %}
+      <tr><td>{{ s }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p style="color:#999">シナリオファイルが見つかりません（data/scenarios/）</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if all_results %}
+<div class="card">
+  <h2>実行済み結果</h2>
+  <table>
+    <thead><tr><th>データセット</th><th>シナリオ</th><th></th></tr></thead>
+    <tbody>
+    {% for ds, scenario_list in all_results.items() %}
+      {% for sc in scenario_list %}
+      <tr>
+        <td>{{ ds }}</td>
+        <td>{{ sc }}</td>
+        <td><a href="/dataset/{{ ds }}/scenario/{{ sc }}" class="btn">詳細</a></td>
+      </tr>
+      {% endfor %}
+    {% endfor %}
+    </tbody>
+  </table>
+  <br>
+  <a href="/compare" class="btn">シナリオ比較</a>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}倉庫シミュレーター{% endblock %}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 14px;
+      background: #f5f6fa;
+      color: #222;
+    }
+    nav {
+      background: #1a237e;
+      color: #fff;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      height: 48px;
+    }
+    nav a {
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+      font-size: 14px;
+    }
+    nav a:hover { color: #fff; }
+    nav .brand {
+      font-weight: 700;
+      font-size: 16px;
+      color: #fff;
+      margin-right: auto;
+    }
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+    h1 { font-size: 22px; margin-bottom: 16px; }
+    h2 { font-size: 17px; margin-bottom: 12px; color: #333; }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td {
+      text-align: left;
+      padding: 7px 10px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    th { background: #f0f2ff; font-weight: 600; color: #444; }
+    tr:hover td { background: #fafbff; }
+    .btn {
+      display: inline-block;
+      padding: 6px 14px;
+      background: #1a237e;
+      color: #fff;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .btn:hover { background: #283593; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-blue { background: #e3f2fd; color: #0d47a1; }
+    .badge-green { background: #e8f5e9; color: #1b5e20; }
+    .badge-orange { background: #fff3e0; color: #e65100; }
+    canvas { max-width: 100%; }
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    @media (max-width: 768px) { .grid2 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<nav>
+  <span class="brand">倉庫シミュレーター</span>
+  <a href="/">ホーム</a>
+  <a href="/compare">シナリオ比較</a>
+</nav>
+<div class="container">
+  {% block content %}{% endblock %}
+</div>
+<script>
+// Chart.js ミニマル実装（外部CDN不使用）
+// 簡易折れ線グラフ描画ユーティリティ
+const SimpleChart = {
+  colors: ['#1a237e','#00838f','#e65100','#4caf50','#9c27b0'],
+  draw(canvasId, labels, datasets, opts = {}) {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const W = canvas.width, H = canvas.height;
+    const pad = { top: 20, right: 20, bottom: 40, left: 60 };
+    ctx.clearRect(0, 0, W, H);
+
+    const allVals = datasets.flatMap(d => d.data.filter(v => v != null && !isNaN(v)));
+    if (!allVals.length) { ctx.fillText('データなし', W/2, H/2); return; }
+    const minV = opts.minY ?? Math.min(...allVals);
+    const maxV = opts.maxY ?? Math.max(...allVals);
+    const range = maxV - minV || 1;
+
+    const xScale = (i) => pad.left + (i / Math.max(labels.length - 1, 1)) * (W - pad.left - pad.right);
+    const yScale = (v) => H - pad.bottom - ((v - minV) / range) * (H - pad.top - pad.bottom);
+
+    // grid lines
+    ctx.strokeStyle = '#eee'; ctx.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      const y = H - pad.bottom - (i / 4) * (H - pad.top - pad.bottom);
+      ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(W - pad.right, y); ctx.stroke();
+      const val = minV + (range * i / 4);
+      ctx.fillStyle = '#999'; ctx.font = '10px sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(val.toFixed(opts.decimals ?? 0) + (opts.suffix || ''), pad.left - 4, y + 3);
+    }
+
+    // x labels (show max 10)
+    ctx.fillStyle = '#999'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    const step = Math.ceil(labels.length / 10);
+    labels.forEach((l, i) => {
+      if (i % step === 0) ctx.fillText(l, xScale(i), H - pad.bottom + 14);
+    });
+
+    // datasets
+    datasets.forEach((ds, di) => {
+      const color = ds.color || this.colors[di % this.colors.length];
+      ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.setLineDash([]);
+      ctx.beginPath();
+      let started = false;
+      ds.data.forEach((v, i) => {
+        if (v == null || isNaN(v)) return;
+        const x = xScale(i), y = yScale(v);
+        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+      });
+      ctx.stroke();
+    });
+
+    // legend
+    if (opts.legend !== false) {
+      let lx = pad.left;
+      datasets.forEach((ds, di) => {
+        const color = ds.color || this.colors[di % this.colors.length];
+        ctx.fillStyle = color;
+        ctx.fillRect(lx, 4, 14, 10);
+        ctx.fillStyle = '#444'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+        ctx.fillText(ds.label || '', lx + 18, 13);
+        lx += ctx.measureText(ds.label || '').width + 36;
+      });
+    }
+  }
+};
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
