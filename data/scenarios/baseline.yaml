@@ -10,5 +10,5 @@ stocktake:
   args: {}
 costs:
   inbound_per_storage_sec: 30
-  outbound_pick_per_storage_sec: 60
-  outbound_per_card_sec: 2
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2
