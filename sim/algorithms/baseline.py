@@ -12,7 +12,16 @@ from sim.models import CardInfo, Order, StorageState
 
 
 class FillEmptyStorageInbound(InboundAlgorithm):
-    """空いているストレージIDに順番に入庫する。"""
+    """できるだけ少ない箱にまとめて入庫する。
+
+    入庫の手間（コスト）は「その日に入庫したストレージ数 × 固定秒数」で決まるため、
+    1日の入庫が触れる箱数を最小化する。
+
+    - その日の入庫カードが丸ごと収まる箱があれば、その中で空きが最も小さい箱
+      （= ぴったり収まる箱）にまとめて入れる。既に使いかけの箱の空きを優先的に
+      使い切ることで、空き箱を不必要に開けない。
+    - 1箱に収まらない場合のみ、空き容量が大きい箱から順に詰めて箱数を最小化する。
+    """
 
     def assign(
         self,
@@ -20,17 +29,26 @@ class FillEmptyStorageInbound(InboundAlgorithm):
         storages: dict[str, StorageState],
     ) -> list[tuple[str, str]]:
         assignments: list[tuple[str, str]] = []
+        n = len(cards)
+        if n == 0:
+            return assignments
 
-        # 空き容量のあるストレージをID順に並べる
-        available = sorted(
-            [s for s in storages.values() if s.available > 0],
-            key=lambda s: s.storage_id,
-        )
+        def _id_key(sid: str):
+            return (0, int(sid)) if sid.isdigit() else (1, sid)
 
+        available = [s for s in storages.values() if s.available > 0]
+
+        # 全カードが丸ごと入る箱があれば、その中で空きが最小（ぴったり）の箱にまとめる。
+        fitting = [s for s in available if s.available >= n]
+        if fitting:
+            target = min(fitting, key=lambda s: (s.available, _id_key(s.storage_id)))
+            return [(card.card_id, target.storage_id) for card in cards]
+
+        # 1箱に収まらない場合は、空きが大きい箱から順に詰めて触れる箱数を最小化する。
+        order = sorted(available, key=lambda s: (-s.available, _id_key(s.storage_id)))
         card_iter = iter(cards)
-        for storage in available:
-            slots = storage.available
-            for _ in range(slots):
+        for storage in order:
+            for _ in range(storage.available):
                 try:
                     card = next(card_iter)
                 except StopIteration:

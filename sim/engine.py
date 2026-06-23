@@ -142,6 +142,12 @@ def run_simulation(
 
             log.inbound_assignments = list(assignments)
 
+            # アニメーション用: ストレージ別入庫枚数
+            for _card_id, storage_id in assignments:
+                log.inbound_by_storage[storage_id] = (
+                    log.inbound_by_storage.get(storage_id, 0) + 1
+                )
+
             # 入庫コスト計算
             used_storage_ids = {a[1] for a in assignments}
             log.inbound_cost_sec = (
@@ -181,6 +187,10 @@ def run_simulation(
                 out_storage_ids.add(storage.storage_id)
                 storage.cards.remove(card)
                 card.storage_id = None
+                # アニメーション用: ストレージ別出庫枚数
+                log.outbound_by_storage[storage.storage_id] = (
+                    log.outbound_by_storage.get(storage.storage_id, 0) + 1
+                )
 
             # 出庫コストとあたり率を計算
             # 対象ストレージの割り出し（実際に在庫があったストレージ、出庫前のカード数を使う）
@@ -245,6 +255,9 @@ def run_simulation(
 
         log.stocktake_moves = list(moves)
         log.stocktake_cost_sec = stocktake_cost
+
+        # アニメーション用: その日の終了時点でのストレージ別在庫数を記録
+        log.storage_counts = {sid: s.count for sid, s in storages.items()}
 
         logs.append(log)
         current += timedelta(days=1)

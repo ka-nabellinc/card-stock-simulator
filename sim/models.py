@@ -82,6 +82,10 @@ class DailyLog:
     hit_rate: Optional[float] = None
     outbound_cards_count: int = 0
     outbound_total_storage_cards: int = 0
+    # アニメーション用: その日の終了時点でのストレージ別在庫数と、当日の入出庫枚数
+    storage_counts: dict[str, int] = field(default_factory=dict)
+    inbound_by_storage: dict[str, int] = field(default_factory=dict)
+    outbound_by_storage: dict[str, int] = field(default_factory=dict)
 
     @property
     def total_cost_sec(self) -> float:

@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}{{ dataset }} / {{ scenario_name }} アニメーション — 倉庫シミュレーター{% endblock %}
+
+{% block content %}
+<p style="color:#666;margin-bottom:8px">
+  <a href="/dataset/{{ dataset }}">{{ dataset }}</a>
+  &rsaquo; <a href="/dataset/{{ dataset }}/scenario/{{ scenario_name }}">{{ scenario_name }}</a>
+  &rsaquo; アニメーション
+</p>
+<h1>在庫変動アニメーション: {{ scenario_name }}</h1>
+
+<div class="card">
+  <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+    <button id="playBtn" class="btn" style="min-width:88px">▶ 再生</button>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="color:#666">速度</span>
+      <select id="speed" style="padding:5px 8px;border:1px solid #ccc;border-radius:4px;font-size:13px">
+        <option value="500">0.5x</option>
+        <option value="250">1x</option>
+        <option value="120" selected>2x</option>
+        <option value="60">4x</option>
+        <option value="20">10x</option>
+      </select>
+    </div>
+    <div style="flex:1;min-width:240px;display:flex;align-items:center;gap:10px">
+      <input id="scrub" type="range" min="0" max="0" value="0" style="flex:1">
+    </div>
+  </div>
+
+  <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:baseline;margin-bottom:6px">
+    <div style="font-size:18px;font-weight:700" id="dateLabel">—</div>
+    <div style="color:#1b5e20">入庫: <span id="inToday">0</span></div>
+    <div style="color:#b71c1c">出庫: <span id="outToday">0</span></div>
+    <div style="color:#444">在庫合計: <span id="stockTotal">0</span></div>
+    <div style="color:#444">使用中ストレージ: <span id="usedStorages">0</span></div>
+  </div>
+
+  <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:#666;margin-bottom:12px">
+    <span><span style="display:inline-block;width:12px;height:12px;background:#1a237e;border-radius:2px;vertical-align:-1px"></span> 在庫充填率</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#4caf50;border-radius:2px;vertical-align:-1px"></span> 当日入庫</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#e53935;border-radius:2px;vertical-align:-1px"></span> 当日出庫</span>
+  </div>
+
+  <div style="overflow-x:auto">
+    <canvas id="grid"></canvas>
+  </div>
+  <p style="color:#999;font-size:12px;margin-top:8px">
+    各マスが1ストレージ。塗りつぶしの高さが充填率（在庫数 / 容量）。当日入庫があれば緑、出庫があれば赤の枠でフラッシュします。マスにマウスを乗せると詳細を表示します。
+  </p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const DATASET = {{ dataset | tojson }};
+const SCENARIO = {{ scenario_name | tojson }};
+
+const canvas = document.getElementById('grid');
+const ctx = canvas.getContext('2d');
+const tip = (() => {
+  const el = document.createElement('div');
+  el.style.cssText = 'position:fixed;pointer-events:none;z-index:1000;display:none;'
+    + 'background:rgba(33,33,33,.92);color:#fff;font-size:12px;line-height:1.5;'
+    + 'padding:8px 10px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.25);white-space:nowrap;';
+  document.body.appendChild(el);
+  return el;
+})();
+
+let DATA = null;
+let frame = 0;
+let timer = null;
+let cols = 1, cellW = 0, cellH = 0, gap = 4, originY = 0;
+const CELL = 34;     // ターゲットセルサイズ
+const LABELH = 0;
+
+function layout() {
+  const n = DATA.storage_ids.length;
+  const maxW = Math.min(canvas.parentElement.clientWidth || 1040, 1040);
+  cols = Math.max(1, Math.floor((maxW + gap) / (CELL + gap)));
+  const rows = Math.ceil(n / cols);
+  cellW = cellH = CELL;
+  canvas.width = cols * (cellW + gap) - gap;
+  canvas.height = rows * (cellH + gap) - gap;
+}
+
+function cellRect(i) {
+  const r = Math.floor(i / cols), c = i % cols;
+  return {
+    x: c * (cellW + gap),
+    y: r * (cellH + gap),
+    w: cellW, h: cellH,
+  };
+}
+
+function render() {
+  if (!DATA) return;
+  const f = DATA.frames[frame];
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < DATA.storage_ids.length; i++) {
+    const cap = DATA.capacity[i] || 1;
+    const cnt = f.counts[i] || 0;
+    const ratio = Math.max(0, Math.min(1, cnt / cap));
+    const { x, y, w, h } = cellRect(i);
+
+    // 背景（空き）
+    ctx.fillStyle = '#eef0f5';
+    ctx.fillRect(x, y, w, h);
+    // 充填（下から上へ）
+    const fh = Math.round(h * ratio);
+    ctx.fillStyle = ratio >= 0.999 ? '#c62828' : (ratio >= 0.85 ? '#5c6bc0' : '#1a237e');
+    ctx.fillRect(x, y + (h - fh), w, fh);
+
+    // 入出庫フラッシュ枠
+    const inb = f.inbound[i] || 0, outb = f.outbound[i] || 0;
+    if (inb && outb) {
+      ctx.strokeStyle = '#4caf50'; ctx.lineWidth = 3;
+      ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+      ctx.strokeStyle = '#e53935'; ctx.lineWidth = 3;
+      ctx.setLineDash([5, 4]);
+      ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+      ctx.setLineDash([]);
+    } else if (inb) {
+      ctx.strokeStyle = '#4caf50'; ctx.lineWidth = 3;
+      ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+    } else if (outb) {
+      ctx.strokeStyle = '#e53935'; ctx.lineWidth = 3;
+      ctx.strokeRect(x + 1.5, y + 1.5, w - 3, h - 3);
+    } else {
+      ctx.strokeStyle = '#dfe2ea'; ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    }
+  }
+  updateHud();
+}
+
+function updateHud() {
+  const f = DATA.frames[frame];
+  const stockTotal = f.counts.reduce((s, v) => s + v, 0);
+  const used = f.counts.filter(v => v > 0).length;
+  document.getElementById('dateLabel').textContent = f.date;
+  document.getElementById('inToday').textContent = f.inbound_total;
+  document.getElementById('outToday').textContent = f.outbound_total;
+  document.getElementById('stockTotal').textContent = stockTotal.toLocaleString();
+  document.getElementById('usedStorages').textContent = used + ' / ' + DATA.storage_ids.length;
+  document.getElementById('scrub').value = frame;
+}
+
+function step() {
+  frame++;
+  if (frame >= DATA.frames.length) { frame = DATA.frames.length - 1; pause(); return; }
+  render();
+}
+
+function play() {
+  if (frame >= DATA.frames.length - 1) frame = 0;
+  const ms = +document.getElementById('speed').value;
+  timer = setInterval(step, ms);
+  document.getElementById('playBtn').textContent = '⏸ 一時停止';
+}
+function pause() {
+  if (timer) { clearInterval(timer); timer = null; }
+  document.getElementById('playBtn').textContent = '▶ 再生';
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (timer) pause(); else play();
+});
+document.getElementById('speed').addEventListener('change', () => {
+  if (timer) { pause(); play(); }
+});
+document.getElementById('scrub').addEventListener('input', (e) => {
+  pause();
+  frame = +e.target.value;
+  render();
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  if (!DATA) return;
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * sx, my = (e.clientY - rect.top) * sy;
+  const c = Math.floor(mx / (cellW + gap)), r = Math.floor(my / (cellH + gap));
+  const i = r * cols + c;
+  if (c < 0 || c >= cols || i < 0 || i >= DATA.storage_ids.length) { tip.style.display = 'none'; return; }
+  const rc = cellRect(i);
+  if (mx > rc.x + rc.w || my > rc.y + rc.h) { tip.style.display = 'none'; return; }
+  const f = DATA.frames[frame];
+  tip.innerHTML = `<div style="font-weight:600;margin-bottom:3px">ストレージ ${DATA.storage_ids[i]}</div>`
+    + `在庫: ${f.counts[i]} / ${DATA.capacity[i]}<br>`
+    + `当日入庫: ${f.inbound[i] || 0}　出庫: ${f.outbound[i] || 0}`;
+  tip.style.display = 'block';
+  let left = e.clientX + 14;
+  if (left + tip.offsetWidth > window.innerWidth - 8) left = e.clientX - tip.offsetWidth - 14;
+  tip.style.left = left + 'px';
+  tip.style.top = (e.clientY + 14) + 'px';
+});
+canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+
+window.addEventListener('resize', () => { if (DATA) { layout(); render(); } });
+
+fetch(`/api/animation/${encodeURIComponent(DATASET)}/${encodeURIComponent(SCENARIO)}`)
+  .then(r => r.json())
+  .then(d => {
+    DATA = d;
+    document.getElementById('scrub').max = d.frames.length - 1;
+    layout();
+    render();
+  })
+  .catch(() => {
+    document.querySelector('.card').insertAdjacentHTML('beforeend',
+      '<p style="color:#b71c1c">アニメーションデータの読み込みに失敗しました。</p>');
+  });
+</script>
+{% endblock %}

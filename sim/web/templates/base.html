@@ -98,16 +98,84 @@
 // 簡易折れ線グラフ描画ユーティリティ
 const SimpleChart = {
   colors: ['#1a237e','#00838f','#e65100','#4caf50','#9c27b0'],
+  _tooltip: null,
+
+  _getTooltip() {
+    if (!this._tooltip) {
+      const el = document.createElement('div');
+      el.style.cssText = 'position:fixed;pointer-events:none;z-index:1000;display:none;'
+        + 'background:rgba(33,33,33,.92);color:#fff;font-size:12px;line-height:1.5;'
+        + 'padding:8px 10px;border-radius:6px;box-shadow:0 2px 8px rgba(0,0,0,.25);white-space:nowrap;';
+      document.body.appendChild(el);
+      this._tooltip = el;
+    }
+    return this._tooltip;
+  },
+
+  _fmt(v, opts) {
+    return v.toFixed(opts.decimals ?? 0) + (opts.suffix || '');
+  },
+
   draw(canvasId, labels, datasets, opts = {}) {
     const canvas = document.getElementById(canvasId);
     if (!canvas) return;
+    const state = { labels, datasets, opts };
+    canvas.__chart = state;
+    this._render(canvas, -1);
+
+    if (!canvas.__hoverBound) {
+      canvas.__hoverBound = true;
+      canvas.addEventListener('mousemove', (e) => this._onMove(canvas, e));
+      canvas.addEventListener('mouseleave', () => {
+        this._getTooltip().style.display = 'none';
+        if (canvas.__chart) this._render(canvas, -1);
+      });
+    }
+  },
+
+  _onMove(canvas, e) {
+    const st = canvas.__chart;
+    if (!st || !st.labels.length) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const pad = { top: 20, right: 20, bottom: 40, left: 60 };
+    const innerW = canvas.width - pad.left - pad.right;
+    const n = st.labels.length;
+    let idx = Math.round(((mx - pad.left) / innerW) * Math.max(n - 1, 1));
+    idx = Math.max(0, Math.min(n - 1, idx));
+
+    this._render(canvas, idx);
+
+    const tip = this._getTooltip();
+    let html = `<div style="font-weight:600;margin-bottom:4px">${st.labels[idx]}</div>`;
+    st.datasets.forEach((ds, di) => {
+      const v = ds.data[idx];
+      const color = ds.color || this.colors[di % this.colors.length];
+      const txt = (v == null || isNaN(v)) ? '—' : this._fmt(v, st.opts);
+      html += `<div style="display:flex;align-items:center;gap:6px">`
+        + `<span style="width:9px;height:9px;border-radius:2px;background:${color};display:inline-block"></span>`
+        + `<span>${ds.label ? ds.label + ': ' : ''}${txt}</span></div>`;
+    });
+    tip.innerHTML = html;
+    tip.style.display = 'block';
+    // position near cursor, flip left if near right edge
+    const tw = tip.offsetWidth;
+    let left = e.clientX + 14;
+    if (left + tw > window.innerWidth - 8) left = e.clientX - tw - 14;
+    tip.style.left = left + 'px';
+    tip.style.top = (e.clientY + 14) + 'px';
+  },
+
+  _render(canvas, highlight) {
+    const { labels, datasets, opts } = canvas.__chart;
     const ctx = canvas.getContext('2d');
     const W = canvas.width, H = canvas.height;
     const pad = { top: 20, right: 20, bottom: 40, left: 60 };
     ctx.clearRect(0, 0, W, H);
 
     const allVals = datasets.flatMap(d => d.data.filter(v => v != null && !isNaN(v)));
-    if (!allVals.length) { ctx.fillText('データなし', W/2, H/2); return; }
+    if (!allVals.length) { ctx.fillStyle = '#999'; ctx.textAlign = 'center'; ctx.fillText('データなし', W/2, H/2); return; }
     const minV = opts.minY ?? Math.min(...allVals);
     const maxV = opts.maxY ?? Math.max(...allVals);
     const range = maxV - minV || 1;
@@ -133,6 +201,14 @@ const SimpleChart = {
       if (i % step === 0) ctx.fillText(l, xScale(i), H - pad.bottom + 14);
     });
 
+    // crosshair for highlighted index
+    if (highlight >= 0) {
+      const hx = xScale(highlight);
+      ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.moveTo(hx, pad.top); ctx.lineTo(hx, H - pad.bottom); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
     // datasets
     datasets.forEach((ds, di) => {
       const color = ds.color || this.colors[di % this.colors.length];
@@ -145,6 +221,16 @@ const SimpleChart = {
         if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
       });
       ctx.stroke();
+
+      // highlighted point marker
+      if (highlight >= 0) {
+        const v = ds.data[highlight];
+        if (v != null && !isNaN(v)) {
+          const x = xScale(highlight), y = yScale(v);
+          ctx.fillStyle = '#fff'; ctx.strokeStyle = color; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+        }
+      }
     });
 
     // legend

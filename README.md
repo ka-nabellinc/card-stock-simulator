@@ -60,7 +60,7 @@ uv run python -m sim.web_run --data-dir ./data --port 8080 --debug
 
 | クラス | 種別 | 動作 |
 |---|---|---|
-| `FillEmptyStorageInbound` | 入庫 | 空き容量のあるストレージにID昇順で詰める |
+| `FillEmptyStorageInbound` | 入庫 | その日の入庫が丸ごと入る箱（空きが最小の箱を優先）にまとめて入れ、入らなければ空きの大きい箱から順に詰めて触れる箱数を最小化する |
 | `OldestFirstOutbound` | 出庫 | 入庫日が古いカードから選ぶ（FIFO） |
 | `SmallestStorageFirstOutbound` | 出庫 | ストレージIDが小さい順にカードを選ぶ |
 | `NoStocktake` | 棚卸し | 何もしない（常に移動なし・コスト0） |
@@ -184,3 +184,6 @@ uv run python -m sim.run baseline --dataset my_dataset
 | `daily_detail.csv` | 入庫・出庫・棚卸しの明細（card_id, storage_id, 日付, 種別） |
 | `daily_summary.csv` | 日次集計（コスト内訳、あたり率、入出庫枚数） |
 | `summary.json` | グラフ用 JSON（Web アプリが参照） |
+| `animation.json` | 在庫変動アニメーション用 JSON（日次のストレージ別在庫数・入出庫数） |
+
+Web のシナリオ詳細ページから「在庫変動アニメーション」を開くと、各ストレージの充填率と日々の入出庫を倉庫マップ風に再生できます。

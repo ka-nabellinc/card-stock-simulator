@@ -121,6 +121,27 @@ def scenario_detail(dataset: str, scenario: str):
     )
 
 
+@app.route("/dataset/<dataset>/scenario/<scenario>/animation")
+def scenario_animation(dataset: str, scenario: str):
+    path = _get_data_dir() / "output" / dataset / scenario / "animation.json"
+    if not path.exists():
+        abort(404)
+    return render_template(
+        "animation.html",
+        dataset=dataset,
+        scenario_name=scenario,
+    )
+
+
+@app.route("/api/animation/<dataset>/<scenario>")
+def api_animation(dataset: str, scenario: str):
+    path = _get_data_dir() / "output" / dataset / scenario / "animation.json"
+    if not path.exists():
+        abort(404)
+    with path.open(encoding="utf-8") as f:
+        return app.response_class(f.read(), mimetype="application/json")
+
+
 @app.route("/compare")
 def compare():
     dataset = request.args.get("dataset", "")

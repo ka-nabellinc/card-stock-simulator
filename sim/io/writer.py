@@ -77,8 +77,49 @@ def write_summary_json(logs: list[DailyLog], output_dir: Path) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def write_all(logs: list[DailyLog], output_dir: Path) -> None:
+def write_animation_json(
+    logs: list[DailyLog], storage_capacity: dict[str, int], output_dir: Path
+) -> None:
+    """アニメーション用のストレージ別在庫推移を保存する。
+
+    storage_ids に並んだ順で、各フレーム（=1日）の在庫数・入庫数・出庫数を
+    配列で持つ。Web 側はこの配列を使って倉庫マップを描画する。
+    """
+    def _key(sid: str):
+        return (0, int(sid)) if sid.isdigit() else (1, sid)
+
+    storage_ids = sorted(storage_capacity.keys(), key=_key)
+    capacity = [storage_capacity[sid] for sid in storage_ids]
+
+    frames = []
+    for log in logs:
+        frames.append({
+            "date": log.date.isoformat(),
+            "counts": [log.storage_counts.get(sid, 0) for sid in storage_ids],
+            "inbound": [log.inbound_by_storage.get(sid, 0) for sid in storage_ids],
+            "outbound": [log.outbound_by_storage.get(sid, 0) for sid in storage_ids],
+            "inbound_total": sum(log.inbound_by_storage.values()),
+            "outbound_total": sum(log.outbound_by_storage.values()),
+        })
+
+    data = {
+        "storage_ids": storage_ids,
+        "capacity": capacity,
+        "frames": frames,
+    }
+    path = output_dir / "animation.json"
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, separators=(",", ":"))
+
+
+def write_all(
+    logs: list[DailyLog],
+    output_dir: Path,
+    storage_capacity: dict[str, int] | None = None,
+) -> None:
     ensure_output_dir(output_dir)
     write_daily_logs(logs, output_dir)
     write_daily_summary(logs, output_dir)
     write_summary_json(logs, output_dir)
+    if storage_capacity is not None:
+        write_animation_json(logs, storage_capacity, output_dir)

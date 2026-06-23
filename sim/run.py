@@ -93,7 +93,8 @@ def main() -> None:
 
     # 結果出力
     print(f"結果を出力中: {output_dir}")
-    write_all(logs, output_dir)
+    storage_capacity = {sid: s.capacity for sid, s in storages.items()}
+    write_all(logs, output_dir, storage_capacity=storage_capacity)
 
     # サマリ表示
     total_cost = sum(log.total_cost_sec for log in logs)
