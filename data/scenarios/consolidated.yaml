@@ -1,0 +1,19 @@
+name: consolidated
+description: |
+  出庫を「少数・低在庫の箱に寄せる」貪欲アルゴリズムにしたシナリオ。
+  触れる箱数と箱の在庫課金を同時に減らし、総工数を最小化する現行ベスト。
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
+  args:
+    pick_per_storage_sec: 58.49
+    per_card_sec: 0.2
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

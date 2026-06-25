@@ -1,0 +1,19 @@
+name: grouped
+description: |
+  入庫で同じ商品・ランクを同じ箱に集約する（最小エントロピー）亜種。あたり率の最適解検証用。
+  実際には商品ごとに別の箱を開けるため入庫工数が激増し、総工数はむしろ悪化する。
+inbound:
+  class: "sim.algorithms.grouped:GroupByProductInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
+  args:
+    pick_per_storage_sec: 58.49
+    per_card_sec: 0.2
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

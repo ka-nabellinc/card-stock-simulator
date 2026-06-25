@@ -1,9 +1,12 @@
 """Flask Web アプリ（ローカル閲覧用）。"""
 from __future__ import annotations
 import csv
+import importlib
+import inspect
 import json
 from pathlib import Path
 
+import yaml
 from flask import Flask, abort, jsonify, render_template, request
 
 app = Flask(__name__)
@@ -50,12 +53,82 @@ def _get_all_results() -> dict[str, list[str]]:
     return result
 
 
+def _class_doc(class_path: str) -> str:
+    """'module:Class' のクラス docstring を取得する（取得不能なら空文字）。"""
+    if not class_path or ":" not in class_path:
+        return ""
+    module_path, class_name = class_path.split(":", 1)
+    try:
+        module = importlib.import_module(module_path)
+        cls = getattr(module, class_name)
+        return inspect.getdoc(cls) or ""
+    except Exception:
+        return ""
+
+
+def _load_scenario_meta(scenario: str) -> dict | None:
+    """シナリオ YAML を直接読み、説明文・使用アルゴリズム・引数などを返す。
+
+    アルゴリズムクラスのインポートはせず、表示用のメタ情報のみを抽出する
+    （クラスが存在しなくても結果ページが壊れないように）。
+    """
+    path = _get_data_dir() / "scenarios" / f"{scenario}.yaml"
+    if not path.exists():
+        return None
+    with path.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+
+    def _component(section: str) -> dict:
+        s = data.get(section) or {}
+        class_path = s.get("class", "") or ""
+        short = class_path.split(":")[-1] if class_path else ""
+        return {
+            "class_path": class_path,
+            "class_name": short,
+            "args": s.get("args") or {},
+            "doc": _class_doc(class_path),
+        }
+
+    storages = data.get("storages")
+    return {
+        "name": data.get("name", scenario),
+        "description": (data.get("description") or "").strip(),
+        "inbound": _component("inbound"),
+        "outbound": _component("outbound"),
+        "stocktake": _component("stocktake"),
+        "costs": data.get("costs") or {},
+        "storages": storages,
+    }
+
+
 def _load_summary(dataset: str, scenario: str) -> list[dict] | None:
     path = _get_data_dir() / "output" / dataset / scenario / "summary.json"
     if not path.exists():
         return None
     with path.open(encoding="utf-8") as f:
         return json.load(f)
+
+
+def _summary_stats(dataset: str, scenario: str) -> dict | None:
+    """実行済みシナリオの結果サマリ（総工数・あたり率など）を集計して返す。"""
+    data = _load_summary(dataset, scenario)
+    if not data:
+        return None
+    total_sec = sum(
+        d.get("inbound_cost_sec", 0)
+        + d.get("outbound_cost_sec", 0)
+        + d.get("stocktake_cost_sec", 0)
+        for d in data
+    )
+    picked = sum(d.get("outbound_cards_count", 0) for d in data)
+    touched_inv = sum(d.get("outbound_total_storage_cards", 0) for d in data)
+    hit_rate = (picked / touched_inv) if touched_inv else None
+    return {
+        "total_sec": total_sec,
+        "total_hours": total_sec / 3600,
+        "outbound_cards": picked,
+        "hit_rate": hit_rate,
+    }
 
 
 def _read_csv_rows(path: Path) -> tuple[list[str], list[list[str]]]:
@@ -91,11 +164,17 @@ def dataset_detail(dataset: str):
         abort(404)
     scenarios = _get_scenarios()
     ran_scenarios = _get_results_for_dataset(dataset)
+    stats = {s: _summary_stats(dataset, s) for s in ran_scenarios}
+    descriptions = {
+        s: (_load_scenario_meta(s) or {}).get("description", "") for s in scenarios
+    }
     return render_template(
         "dataset.html",
         dataset=dataset,
         scenarios=scenarios,
         ran_scenarios=ran_scenarios,
+        stats=stats,
+        descriptions=descriptions,
     )
 
 
@@ -114,6 +193,7 @@ def scenario_detail(dataset: str, scenario: str):
         dataset=dataset,
         scenario_name=scenario,
         summary=summary,
+        scenario_meta=_load_scenario_meta(scenario),
         detail_headers=detail_headers,
         detail_rows=detail_rows[:200],
         summary_headers=summary_headers,
@@ -171,7 +251,7 @@ def compare():
         current_dataset=dataset,
         ran_scenarios=ran_scenarios,
         selected=selected,
-        summaries_json=json.dumps(summaries),
+        summaries=summaries,
     )
 
 

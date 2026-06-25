@@ -78,7 +78,7 @@
 {% block scripts %}
 {% if selected %}
 <script>
-const allSummaries = {{ summaries_json }};
+const allSummaries = {{ summaries | tojson }};
 const selectedNames = {{ selected | tojson }};
 
 const allDates = new Set();

@@ -76,9 +76,44 @@ card-stock-simulator/
 - **`SmallestStorageFirstOutbound`**: ストレージIDが小さい順に出庫候補を選択。
 - **`NoStocktake`**: 何もしない。常に `([], 0.0)` を返す。
 
+### `sim/algorithms/consolidated.py`
+
+出庫を少数のストレージに集約するアルゴリズム。
+
+- **`ConsolidatedStorageOutbound`**: 出庫コストが「触れた箱数 × 固定秒 + 触れた箱の在庫総数 × 秒」で決まることを利用し、1日の注文を貪欲な重み付き集合被覆で少数・低在庫の箱に寄せる。各ラウンドで「限界コスト ÷ 新規にカバーできる需要」が最小の箱を1つ確定し、確定した箱からはカバー可能な需要を取り切る（一度触れた箱からの追加取り出しは在庫課金が増えないため）。触れる箱数と在庫課金を同時に減らし、あたり率（出庫枚数 ÷ 触れた箱の在庫総数）も上がる。コンストラクタ引数 `pick_per_storage_sec` / `per_card_sec` にシナリオの costs と同じ値を渡すと貪欲判断の精度が上がる。
+
+### `sim/algorithms/grouped.py`
+
+あたり率の最適解を検証するための入庫アルゴリズム。
+
+- **`GroupByProductInbound`**: 同じ `(product_id, rank)` を同じ箱（ホーム箱）に寄せて入庫する。配置先候補は「①既にその key を含む箱 → ②空の箱 → ③その他空きのある箱」の優先順で、空き箱が残る限り key の混在を避ける。日をまたいで同じ商品が入荷してもホーム箱に追記される。実運用では入庫時の仕分け手間が増えるため、トレードオフ検証用。
+
+### `sim/algorithms/scatter.py`
+
+集約の真逆（エントロピー最大化）を検証する入庫アルゴリズム。
+
+- **`ScatterInbound`**: 同じ `(product_id, rank)` をできるだけ別々の箱へ分散する。各カードは「その key を含む枚数が最小の箱 → 同数なら空きが大きい箱 → ID 昇順」で配置先を選ぶ。集約・分散のどちらの極端も入庫コスト（=その日に触れた箱数×固定秒）を増やし、密詰めの `FillEmptyStorageInbound` が最良になることを示す比較用。
+
 同梱シナリオ（`data/scenarios/`）:
 - `baseline`: `FillEmptyStorageInbound` + `OldestFirstOutbound` + `NoStocktake`
 - `simple`: `FillEmptyStorageInbound` + `SmallestStorageFirstOutbound` + `NoStocktake`
+- `consolidated`: `FillEmptyStorageInbound` + `ConsolidatedStorageOutbound` + `NoStocktake`
+- `grouped`: `GroupByProductInbound` + `ConsolidatedStorageOutbound` + `NoStocktake`（あたり率最適解の検証用。入庫工数が大幅に増える）
+- `smallbox`: `consolidated` と同じアルゴリズムで、ストレージ定義を「1箱100枚 × 1000箱」に上書きした箱サイズ感度分析用シナリオ
+- `box300`: 同上で「1箱300枚 × 334箱」（総容量を約100,000枚に揃えて箱サイズだけを比較）
+- `scattered`: `consolidated` の入庫だけを `ScatterInbound`（分散）に差し替えた亜種
+
+### シナリオによるストレージ定義の上書き
+
+シナリオ YAML に任意の `storages` ブロックを置くと、そのシナリオだけ別の箱構成で
+実行できる（`sim/scenario.py` の `StorageConfig`）。
+
+- `{ count: N, capacity: C }`: ID `'1'..'N'`・容量 `C` の箱を `generate_storages()` で生成。
+- `{ file: "xxx.csv" }`: データセットディレクトリ内の別 CSV を `load_storages()` で読み込む。
+- 省略時はデータセットの `storages.csv`。
+
+上書き時に `initial_stock.csv` があると、CSV の `storage_id` は箱構成変更で無効になるため
+`place_initial_stock_auto()` が ID 昇順の箱へ順に詰め直す。
 
 ### `sim/scenario.py`
 
@@ -122,7 +157,7 @@ Flask ローカル Web アプリ。外部公開しない前提でシンプルに
 エンドポイント:
 - `GET /` — データセット一覧・シナリオ一覧・実行済み結果一覧
 - `GET /dataset/<dataset>` — データセット詳細（入力ファイル・シナリオ実行状況）
-- `GET /dataset/<dataset>/scenario/<scenario>` — 日次グラフ・明細テーブル
+- `GET /dataset/<dataset>/scenario/<scenario>` — シナリオ説明文・使用アルゴリズム/引数/docstring・コスト定数・ストレージ定義・日次グラフ・明細テーブル
 - `GET /dataset/<dataset>/scenario/<scenario>/animation` — 在庫変動アニメーション
 - `GET /compare?dataset=<ds>&s=<sc>` — 同一データセット内でのシナリオ比較
 - `GET /dataset/<dataset>/input/<filename>` — 入力 CSV の表示

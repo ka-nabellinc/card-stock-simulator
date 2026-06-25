@@ -1,0 +1,25 @@
+name: smallbox
+description: |
+  consolidated と同じアルゴリズムのまま、箱を「1箱100枚 × 1000箱」に上書きした箱サイズ実験。
+  あたり率は大きく上がるが、箱への移動固定費が増えて総工数は悪化する。
+# ストレージ定義をシナリオ側で上書きする実験。
+# 1箱=100枚を1000箱（=容量100,000枚）。consolidated と入出庫アルゴリズムは同じで、
+# 箱サイズだけを変えてあたり率・出庫コストへの影響を見る。
+storages:
+  count: 1000
+  capacity: 100
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
+  args:
+    pick_per_storage_sec: 58.49
+    per_card_sec: 0.2
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

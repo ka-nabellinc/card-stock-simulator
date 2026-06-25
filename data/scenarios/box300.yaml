@@ -1,0 +1,24 @@
+name: box300
+description: |
+  consolidated と同じアルゴリズムで、箱を「1箱300枚 × 334箱」に上書きした箱サイズ実験（総容量は約100,000枚で統一）。
+  consolidated(大箱) と smallbox(小箱) の中間の挙動を確認する。
+# 箱サイズ感度分析: consolidated と同じアルゴリズムで、1箱300枚 × 334箱（容量約100,000枚）。
+# consolidated(100×1000) / smallbox(1000×100) と総容量を揃えて箱サイズだけを比較する。
+storages:
+  count: 334
+  capacity: 300
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
+  args:
+    pick_per_storage_sec: 58.49
+    per_card_sec: 0.2
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

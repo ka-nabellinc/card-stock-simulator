@@ -63,6 +63,9 @@ uv run python -m sim.web_run --data-dir ./data --port 8080 --debug
 | `FillEmptyStorageInbound` | 入庫 | その日の入庫が丸ごと入る箱（空きが最小の箱を優先）にまとめて入れ、入らなければ空きの大きい箱から順に詰めて触れる箱数を最小化する |
 | `OldestFirstOutbound` | 出庫 | 入庫日が古いカードから選ぶ（FIFO） |
 | `SmallestStorageFirstOutbound` | 出庫 | ストレージIDが小さい順にカードを選ぶ |
+| `ConsolidatedStorageOutbound` | 出庫 | 1日の注文をできるだけ少数・低在庫のストレージにまとめて出庫する（貪欲な重み付き集合被覆）。触れる箱数と箱の在庫課金を減らし、あたり率も上げる |
+| `GroupByProductInbound` | 入庫 | 同じ商品・ランクをできるだけ同じ箱（ホーム箱）に寄せて入庫する。あたり率の最適解を検証する用途。実運用では入庫時の仕分け手間が増える |
+| `ScatterInbound` | 入庫 | 同じ商品・ランクをできるだけ別々の箱へ分散（エントロピー最大化）して入庫する。集約の真逆を検証する用途 |
 | `NoStocktake` | 棚卸し | 何もしない（常に移動なし・コスト0） |
 
 ## 同梱シナリオ（`data/scenarios/`）
@@ -71,6 +74,13 @@ uv run python -m sim.web_run --data-dir ./data --port 8080 --debug
 |---|---|---|---|
 | `baseline` | `FillEmptyStorageInbound` | `OldestFirstOutbound` | `NoStocktake` |
 | `simple` | `FillEmptyStorageInbound` | `SmallestStorageFirstOutbound` | `NoStocktake` |
+| `consolidated` | `FillEmptyStorageInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+| `grouped` | `GroupByProductInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+| `scattered` | `ScatterInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+| `smallbox` | `FillEmptyStorageInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+| `box300` | `FillEmptyStorageInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+
+`smallbox`（1箱100枚×1000箱）と `box300`（1箱300枚×334箱）は、`consolidated` と同じアルゴリズムのままストレージ定義だけを上書きして箱サイズの影響を見る実験用シナリオです（後述「ストレージ定義の上書き」）。いずれも総容量を約100,000枚に揃えてあります。
 
 ## シナリオの追加方法
 
@@ -106,6 +116,9 @@ class SmartInbound(InboundAlgorithm):
 
 ```yaml
 name: my_scenario
+description: |
+  このシナリオの目的や狙いを書く（任意・複数行可）。
+  Web のシナリオ結果ページとデータセット一覧に表示される。
 inbound:
   class: "sim.algorithms.my_algo:SmartInbound"
   args:
@@ -121,6 +134,29 @@ costs:
   outbound_pick_per_storage_sec: 60
   outbound_per_card_sec: 2
 ```
+
+#### ストレージ定義の上書き（任意）
+
+シナリオに `storages` ブロックを追加すると、そのシナリオだけデータセットの
+`storages.csv` とは異なる箱構成で実験できます（箱サイズの感度分析など）。
+
+```yaml
+# 1箱100枚を1000箱（容量100,000枚）に上書き
+storages:
+  count: 1000
+  capacity: 100
+```
+
+または、データセットディレクトリ内の別 CSV を指定:
+
+```yaml
+storages:
+  file: "storages_small.csv"
+```
+
+`storages` を省略するとデータセットの `storages.csv` を使います。上書き時に
+`initial_stock.csv` がある場合は、元の `storage_id` を無視して新しい箱へ ID 昇順に
+詰め直します（開始時点の在庫配置）。
 
 ### 3. 実行する
 

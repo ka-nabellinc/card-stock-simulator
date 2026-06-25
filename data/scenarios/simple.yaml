@@ -1,4 +1,7 @@
 name: simple
+description: |
+  baseline の出庫だけをストレージID昇順の選択に変えたシナリオ。
+  出庫の選び方（FIFO vs 箱ID順）の違いを見るための比較用。
 inbound:
   class: "sim.algorithms.baseline:FillEmptyStorageInbound"
   args: {}

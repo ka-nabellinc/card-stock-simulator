@@ -7,6 +7,59 @@
 </p>
 <h1>シナリオ: {{ scenario_name }}</h1>
 
+{% if scenario_meta %}
+<div class="card" style="margin-bottom:16px">
+  {% if scenario_meta.description %}
+  <h2>説明</h2>
+  <p style="white-space:pre-wrap;margin-bottom:16px">{{ scenario_meta.description }}</p>
+  {% endif %}
+
+  <h2>使用アルゴリズムと設定</h2>
+  <table>
+    <thead><tr><th>工程</th><th>アルゴリズム</th><th>引数</th><th>説明</th></tr></thead>
+    <tbody>
+      {% for stage, label in [('inbound','入庫'), ('outbound','出庫'), ('stocktake','棚卸し')] %}
+      {% set comp = scenario_meta[stage] %}
+      <tr>
+        <td style="white-space:nowrap"><strong>{{ label }}</strong></td>
+        <td style="white-space:nowrap">
+          <code>{{ comp.class_name }}</code>
+          <div style="color:#999;font-size:11px">{{ comp.class_path }}</div>
+        </td>
+        <td>
+          {% if comp.args %}
+            {% for k, v in comp.args.items() %}<div style="font-size:12px"><code>{{ k }}={{ v }}</code></div>{% endfor %}
+          {% else %}<span style="color:#999">—</span>{% endif %}
+        </td>
+        <td style="font-size:12px;color:#555;white-space:pre-wrap;max-width:420px">{{ comp.doc or '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <div style="display:flex;gap:24px;flex-wrap:wrap;margin-top:14px;font-size:13px;color:#555">
+    <div>
+      <strong>コスト定数</strong>
+      <div>入庫: {{ scenario_meta.costs.inbound_per_storage_sec }} 秒/箱</div>
+      <div>出庫(箱): {{ scenario_meta.costs.outbound_pick_per_storage_sec }} 秒/箱</div>
+      <div>出庫(枚): {{ scenario_meta.costs.outbound_per_card_sec }} 秒/枚</div>
+    </div>
+    <div>
+      <strong>ストレージ定義</strong>
+      {% if scenario_meta.storages %}
+        {% if scenario_meta.storages.file %}
+        <div>ファイル上書き: <code>{{ scenario_meta.storages.file }}</code></div>
+        {% else %}
+        <div>{{ scenario_meta.storages.count }} 箱 × 容量 {{ scenario_meta.storages.capacity }}（シナリオで上書き）</div>
+        {% endif %}
+      {% else %}
+        <div>データセット既定（storages.csv）</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if summary %}
 <p style="margin-bottom:16px">
   <a class="btn" href="/dataset/{{ dataset }}/scenario/{{ scenario_name }}/animation">▶ 在庫変動アニメーション</a>

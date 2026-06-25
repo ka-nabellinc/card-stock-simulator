@@ -1,4 +1,7 @@
 name: baseline
+description: |
+  動作確認用の基準シナリオ。入庫は空き箱に密に詰め、出庫は入庫日が古い順（FIFO）に選ぶ。
+  他シナリオと比較するための出発点。
 inbound:
   class: "sim.algorithms.baseline:FillEmptyStorageInbound"
   args: {}

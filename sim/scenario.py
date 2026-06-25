@@ -17,12 +17,27 @@ class CostConfig:
 
 
 @dataclass
+class StorageConfig:
+    """シナリオがデータセットのストレージ定義を上書きする場合の設定。
+
+    - count + capacity: ID '1'..'N'、容量 capacity の箱を生成する。
+    - file: データセットディレクトリ内の別 CSV を読み込む。
+    どちらも未指定の場合はデータセットの storages.csv を使う（= None を返す）。
+    """
+    count: int | None = None
+    capacity: int | None = None
+    file: str | None = None
+
+
+@dataclass
 class Scenario:
     name: str
     inbound: InboundAlgorithm
     outbound: OutboundAlgorithm
     stocktake: StocktakeAlgorithm
     costs: CostConfig
+    storages: StorageConfig | None = None
+    description: str = ""
 
 
 def _load_class(class_path: str, args: dict):
@@ -39,6 +54,7 @@ def load_scenario(yaml_path: Path) -> Scenario:
         data = yaml.safe_load(f)
 
     name = data.get("name", yaml_path.stem)
+    description = data.get("description", "") or ""
 
     inbound = _load_class(data["inbound"]["class"], data["inbound"].get("args", {}))
     outbound = _load_class(data["outbound"]["class"], data["outbound"].get("args", {}))
@@ -50,6 +66,22 @@ def load_scenario(yaml_path: Path) -> Scenario:
         outbound_pick_per_storage_sec=float(costs_raw.get("outbound_pick_per_storage_sec", 60)),
         outbound_per_card_sec=float(costs_raw.get("outbound_per_card_sec", 2)),
     )
+
+    storages_cfg: StorageConfig | None = None
+    storages_raw = data.get("storages")
+    if storages_raw:
+        file = storages_raw.get("file")
+        count = storages_raw.get("count")
+        capacity = storages_raw.get("capacity")
+        if file is None and (count is None or capacity is None):
+            raise ValueError(
+                "scenario.storages は file、または count と capacity の両方を指定してください"
+            )
+        storages_cfg = StorageConfig(
+            count=int(count) if count is not None else None,
+            capacity=int(capacity) if capacity is not None else None,
+            file=file,
+        )
 
     if not isinstance(inbound, InboundAlgorithm):
         raise TypeError(f"{type(inbound)} は InboundAlgorithm を継承していません")
@@ -64,4 +96,6 @@ def load_scenario(yaml_path: Path) -> Scenario:
         outbound=outbound,
         stocktake=stocktake,
         costs=costs,
+        storages=storages_cfg,
+        description=description,
     )

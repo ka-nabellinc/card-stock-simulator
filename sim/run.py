@@ -10,7 +10,14 @@ from datetime import datetime
 from pathlib import Path
 
 from sim.engine import run_simulation
-from sim.io.reader import load_inbound, load_initial_stock, load_orders, load_storages
+from sim.io.reader import (
+    generate_storages,
+    load_inbound,
+    load_initial_stock,
+    load_orders,
+    load_storages,
+    place_initial_stock_auto,
+)
 from sim.io.writer import write_all
 from sim.scenario import load_scenario
 
@@ -58,12 +65,27 @@ def main() -> None:
 
     # 入力データ読み込み
     print("入力データを読み込み中...")
-    storages = load_storages(dataset_dir / "storages.csv")
+    if scenario.storages is not None:
+        sc = scenario.storages
+        if sc.file:
+            storages = load_storages(dataset_dir / sc.file)
+            print(f"  ストレージ定義をシナリオで上書き: {sc.file}（{len(storages)} 箱）")
+        else:
+            storages = generate_storages(sc.count, sc.capacity)
+            print(
+                f"  ストレージ定義をシナリオで上書き: {sc.count} 箱 × 容量 {sc.capacity}"
+            )
+    else:
+        storages = load_storages(dataset_dir / "storages.csv")
 
     all_cards = {}
     initial_stock_path = dataset_dir / "initial_stock.csv"
     if initial_stock_path.exists():
-        all_cards = load_initial_stock(initial_stock_path, storages)
+        if scenario.storages is not None:
+            # ストレージ定義を上書きした場合、元の storage_id は無効なので順に詰め直す
+            all_cards = place_initial_stock_auto(initial_stock_path, storages)
+        else:
+            all_cards = load_initial_stock(initial_stock_path, storages)
         print(f"  初期在庫: {len(all_cards)} 枚")
 
     inbound_cards = load_inbound(dataset_dir / "inbound.csv")

@@ -21,11 +21,16 @@
   <div class="card">
     <h2>シナリオと実行状況</h2>
     <table>
-      <thead><tr><th>シナリオ</th><th>状態</th><th></th></tr></thead>
+      <thead><tr><th>シナリオ</th><th>状態</th><th>総工数</th><th>あたり率</th><th></th></tr></thead>
       <tbody>
       {% for s in scenarios %}
       <tr>
-        <td>{{ s }}</td>
+        <td>
+          {{ s }}
+          {% if descriptions[s] %}
+          <div style="color:#888;font-size:11px;max-width:280px;white-space:normal">{{ descriptions[s].splitlines()[0] }}</div>
+          {% endif %}
+        </td>
         <td>
           {% if s in ran_scenarios %}
             <span class="badge badge-green">実行済み</span>
@@ -33,6 +38,15 @@
             <span style="color:#999;font-size:12px">未実行</span>
           {% endif %}
         </td>
+        {% if s in ran_scenarios and stats[s] %}
+        <td style="text-align:right;white-space:nowrap">{{ "%.1f"|format(stats[s].total_hours) }} h</td>
+        <td style="text-align:right">
+          {% if stats[s].hit_rate is not none %}{{ "%.1f"|format(stats[s].hit_rate * 100) }}%{% else %}—{% endif %}
+        </td>
+        {% else %}
+        <td style="text-align:right;color:#999">—</td>
+        <td style="text-align:right;color:#999">—</td>
+        {% endif %}
         <td>
           {% if s in ran_scenarios %}
             <a href="/dataset/{{ dataset }}/scenario/{{ s }}" class="btn">結果</a>

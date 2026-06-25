@@ -1,0 +1,22 @@
+name: scattered
+description: |
+  入庫で同じ商品・ランクをできるだけ別々の箱へ分散する（最大エントロピー）亜種。集約の真逆の検証用。
+  これも1日に多数の箱を開けるため入庫工数が増え、総工数は悪化する。中立の密詰め(consolidated)が最良であることを示す。
+# consolidated の入庫だけを「分散（エントロピー最大化）」に差し替えた亜種。
+# grouped（集約）↔ consolidated（中立詰め）↔ scattered（分散）の比較用。
+# ストレージはデータセット既定（fullhistory/202606 とも 100×1000）。
+inbound:
+  class: "sim.algorithms.scatter:ScatterInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
+  args:
+    pick_per_storage_sec: 58.49
+    per_card_sec: 0.2
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2
