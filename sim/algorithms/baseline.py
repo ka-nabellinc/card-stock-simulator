@@ -135,9 +135,5 @@ class SmallestStorageFirstOutbound(OutboundAlgorithm):
 class NoStocktake(StocktakeAlgorithm):
     """何もしない棚卸し。常に移動なし・コスト0を返す。"""
 
-    def execute(
-        self,
-        current_date: date,
-        storages: dict[str, StorageState],
-    ) -> tuple[list[tuple[str, str]], float]:
+    def execute(self, current_date, storages, order_history=None):
         return [], 0.0

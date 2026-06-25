@@ -83,6 +83,7 @@ def run_simulation(
         raise ValueError(f"開始日 {sim_start} が終了日 {sim_end} より後です")
 
     logs: list[DailyLog] = []
+    completed_outbound: list[tuple[date, Order]] = []
     current = sim_start
 
     while current <= sim_end:
@@ -199,6 +200,9 @@ def run_simulation(
             for sid in out_storage_ids:
                 total_storage_cards += states[sid].count
 
+            for order, _cid in assignments_out:
+                completed_outbound.append((current, order))
+
             log.outbound_assignments = [(o.order_id, cid) for o, cid in assignments_out]
             log.outbound_cards_count = len(assignments_out)
             log.outbound_total_storage_cards = total_storage_cards
@@ -214,7 +218,7 @@ def run_simulation(
 
         # ---------- 3. 棚卸し処理 ----------
         states = _build_storage_states(storages)
-        moves, stocktake_cost = scenario.stocktake.execute(current, states)
+        moves, stocktake_cost = scenario.stocktake.execute(current, states, completed_outbound)
 
         if moves:
             card_idx = _card_index(storages)

@@ -55,9 +55,13 @@ class StocktakeAlgorithm(ABC):
         self,
         current_date: date,
         storages: dict[str, StorageState],
+        order_history: list[tuple[date, "Order"]] | None = None,
     ) -> tuple[list[tuple[str, str]], float]:
         """
         棚卸しを実行する。
+
+        Args:
+            order_history: (出庫日, Order) のリスト。シミュレーション開始から当日までの出庫履歴。
 
         Returns:
             ([(card_id, destination_storage_id), ...], cost_seconds)
