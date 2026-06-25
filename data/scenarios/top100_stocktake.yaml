@@ -17,7 +17,7 @@ stocktake:
   class: "sim.algorithms.stocktake:Top100WeeklyStocktake"
   args:
     top_n: 100
-    cards_per_type: 4
+    cards_per_type: 40
     lookback_days: 30
     weekday: 0
     target_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
