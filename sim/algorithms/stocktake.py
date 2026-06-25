@@ -1,11 +1,73 @@
-"""棚卸しアルゴリズム集。"""
+"""棚卸し関連アルゴリズム集。"""
 from __future__ import annotations
 
 from collections import Counter, defaultdict
 from datetime import date, timedelta
 
-from sim.algorithms.base import StocktakeAlgorithm
-from sim.models import Order, StorageState
+from sim.algorithms.base import InboundAlgorithm, StocktakeAlgorithm
+from sim.models import CardInfo, Order, StorageState
+
+
+class Top100ReservedInbound(InboundAlgorithm):
+    """TOP100棚卸し専用ストレージを除外して入庫する。
+
+    target_storages（デフォルト: 1〜10番）を棚卸し専用枠として確保し、
+    通常入庫では使わない。それ以外は FillEmptyStorageInbound と同じロジック。
+    """
+
+    def __init__(
+        self,
+        reserved_storages: list[int] | None = None,
+        **kwargs,
+    ):
+        self.reserved_ids: set[str] = (
+            {str(s) for s in reserved_storages}
+            if reserved_storages is not None
+            else {str(i) for i in range(1, 11)}
+        )
+
+    def assign(
+        self,
+        cards: list[CardInfo],
+        storages: dict[str, StorageState],
+    ) -> list[tuple[str, str]]:
+        assignments: list[tuple[str, str]] = []
+        n = len(cards)
+        if n == 0:
+            return assignments
+
+        def _id_key(sid: str):
+            return (0, int(sid)) if sid.isdigit() else (1, sid)
+
+        # 予約済みストレージを除外
+        available = [
+            s for s in storages.values()
+            if s.available > 0 and s.storage_id not in self.reserved_ids
+        ]
+
+        fitting = [s for s in available if s.available >= n]
+        if fitting:
+            target = min(fitting, key=lambda s: (s.available, _id_key(s.storage_id)))
+            return [(card.card_id, target.storage_id) for card in cards]
+
+        order = sorted(available, key=lambda s: (-s.available, _id_key(s.storage_id)))
+        card_iter = iter(cards)
+        for storage in order:
+            for _ in range(storage.available):
+                try:
+                    card = next(card_iter)
+                except StopIteration:
+                    return assignments
+                assignments.append((card.card_id, storage.storage_id))
+
+        remaining = list(card_iter)
+        if remaining:
+            raise RuntimeError(
+                f"入庫できないカードが {len(remaining)} 枚あります: "
+                f"{[c.card_id for c in remaining]}"
+            )
+
+        return assignments
 
 
 class Top100WeeklyStocktake(StocktakeAlgorithm):

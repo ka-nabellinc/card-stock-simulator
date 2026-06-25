@@ -5,8 +5,9 @@ description: |
   毎週月曜に棚卸しを実行し、よく売れるカードを手前に集めることで
   出庫時のピック効率の向上を狙う。
 inbound:
-  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
-  args: {}
+  class: "sim.algorithms.stocktake:Top100ReservedInbound"
+  args:
+    reserved_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 outbound:
   class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
   args:
