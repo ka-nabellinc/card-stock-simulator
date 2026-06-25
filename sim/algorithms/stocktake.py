@@ -84,13 +84,6 @@ class Top100WeeklyStocktake(StocktakeAlgorithm):
                 if key in top_types:
                     other[key].append((card.card_id, sid))
 
-        # ターゲット外ストレージの空き容量を追跡（退避先用）
-        outer_free: dict[str, int] = {
-            sid: storages[sid].available
-            for sid in storages
-            if sid not in target_set
-        }
-
         # ターゲットストレージの空き容量を追跡
         free: dict[str, int] = {
             sid: storages[sid].available
@@ -100,26 +93,6 @@ class Top100WeeklyStocktake(StocktakeAlgorithm):
 
         moves: list[tuple[str, str]] = []
 
-        # ① ターゲットストレージにある「TOP100以外」のカードを外へ退避
-        for sid in self.target_storage_ids:
-            if sid not in storages:
-                continue
-            for card in storages[sid].cards:
-                key = (card.product_id, card.rank)
-                if key in top_types:
-                    continue  # TOP100なので残す
-                # 退避先を探す
-                dest = next(
-                    (s for s, f in outer_free.items() if f > 0),
-                    None,
-                )
-                if dest is None:
-                    break  # 退避先がない
-                moves.append((card.card_id, dest))
-                outer_free[dest] -= 1
-                free[sid] += 1  # 空きが増える
-
-        # ② TOP100カードをターゲットストレージへ移動
         for key in top_types:
             needed = self.cards_per_type - len(already.get(key, []))
             if needed <= 0:
@@ -127,6 +100,7 @@ class Top100WeeklyStocktake(StocktakeAlgorithm):
             for card_id, _src in other.get(key, []):
                 if needed <= 0:
                     break
+                # 空きのあるターゲットストレージを先頭から探す
                 dest = next(
                     (sid for sid in self.target_storage_ids if free.get(sid, 0) > 0),
                     None,
