@@ -21,15 +21,17 @@
 
 ### 2. uv のインストール
 
-Git Bash（または PowerShell）で以下を実行：
+**Python は別途インストール不要です。** uv が Python も自動でインストールします。
+
+スタートメニューから **PowerShell** を起動して以下を実行：
 
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-インストール後、**Git Bash を一度閉じて再度開き**、確認：
+インストール後、**PowerShell を一度閉じて再度開き**、確認：
 
-```
+```powershell
 uv --version
 ```
 
