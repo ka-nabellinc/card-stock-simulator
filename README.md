@@ -33,12 +33,25 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 uv --version
 ```
 
-### 3. リポジトリのクローン
+### 3. ソースコードの取得
+
+**Git が使える場合：**
 
 ```bash
 git clone https://github.com/ka-nabellinc/card-stock-simulator.git
 cd card-stock-simulator
 ```
+
+**Git のアクセス権がない場合（ZIP ダウンロード）：**
+
+1. https://github.com/ka-nabellinc/card-stock-simulator を開く
+2. 緑色の **Code** ボタンをクリック
+3. **Download ZIP** をクリックしてダウンロード
+4. ダウンロードした ZIP を右クリック →「すべて展開」で任意のフォルダに解凍
+5. Git Bash を起動し、解凍したフォルダに移動：
+   ```bash
+   cd /c/Users/ユーザー名/Downloads/card-stock-simulator-main
+   ```
 
 ### 4. 依存パッケージのインストール
 
