@@ -5,7 +5,58 @@
 
 ---
 
-## セットアップ
+## Windows 11 環境構築手順（初回のみ）
+
+完全に何もない状態からの手順です。
+
+### 1. Git のインストール
+
+1. https://git-scm.com/download/win を開く
+2. **64-bit Git for Windows Setup** をダウンロードしてインストール
+3. インストール中の選択肢はすべてデフォルトでOK
+4. インストール後、スタートメニューから **Git Bash** を起動して確認：
+   ```
+   git --version
+   ```
+
+### 2. uv のインストール
+
+Git Bash（または PowerShell）で以下を実行：
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+インストール後、**Git Bash を一度閉じて再度開き**、確認：
+
+```
+uv --version
+```
+
+### 3. リポジトリのクローン
+
+```bash
+git clone https://github.com/ka-nabellinc/card-stock-simulator.git
+cd card-stock-simulator
+```
+
+### 4. 依存パッケージのインストール
+
+```bash
+uv sync
+```
+
+### 5. Web アプリの起動
+
+```bash
+uv run python -m sim.web_run
+```
+
+ブラウザで http://127.0.0.1:8080 を開く。
+
+---
+
+## セットアップ（Mac / Linux）
 
 [uv](https://github.com/astral-sh/uv) が必要です。
 
