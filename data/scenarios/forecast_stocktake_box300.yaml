@@ -1,0 +1,27 @@
+name: forecast_stocktake_box300
+description: |
+  forecast_stocktake と同じアルゴリズムで、箱を「1箱300枚 × 334箱」に上書きしたシナリオ。
+  需要予測ベースの棚卸しと優先出庫を維持しつつ、箱サイズの影響を確認する。
+storages:
+  count: 334
+  capacity: 300
+inbound:
+  class: "sim.algorithms.stocktake:Top100ReservedInbound"
+  args:
+    reserved_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+outbound:
+  class: "sim.algorithms.forecast:PriorityStorageOutbound"
+  args:
+    priority_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+stocktake:
+  class: "sim.algorithms.forecast:ForecastWeeklyStocktake"
+  args:
+    order_csv: "data/external/orders_history.csv"
+    target_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    weekday: 0
+    capacity_per_type: 40
+    move_per_card_sec: 30.0
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2
