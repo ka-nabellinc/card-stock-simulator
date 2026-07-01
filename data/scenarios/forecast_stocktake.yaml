@@ -1,0 +1,26 @@
+name: forecast_stocktake
+description: |
+  需要予測ベースの週次棚卸しシナリオ。
+  外部注文CSVから当月の週次需要を予測し、売れ筋カードを1〜10番ストレージに集める。
+  新弾リリースに対応するため月が変わると予測をリセット。
+  予測外のカードは末尾ストレージへ退避し、出庫は1〜10番を優先してピックする。
+inbound:
+  class: "sim.algorithms.stocktake:Top100ReservedInbound"
+  args:
+    reserved_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+outbound:
+  class: "sim.algorithms.forecast:PriorityStorageOutbound"
+  args:
+    priority_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+stocktake:
+  class: "sim.algorithms.forecast:ForecastWeeklyStocktake"
+  args:
+    order_csv: "data/external/orders_history.csv"
+    target_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    weekday: 0
+    capacity_per_type: 40
+    move_per_card_sec: 30.0
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2
