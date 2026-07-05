@@ -1,0 +1,23 @@
+name: hybrid
+description: |
+  箱サイズ混在（ハイブリッド）構成の実験。小箱100枚×500 + 大箱1000枚×50（計10万枚）。
+  出庫は集約(consolidated)。consolidated は在庫の少ない箱を優先して開けるため、
+  小箱が自然に先に使われてあたり率が上がりつつ、死に筋が大箱にまとまって触れる箱数
+  （＝工数）を抑えられるか――「全箱同サイズ」に対する両取りを検証する。
+storages:
+  file: "storages_hybrid.csv"
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
+  args:
+    pick_per_storage_sec: 58.49
+    per_card_sec: 0.2
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

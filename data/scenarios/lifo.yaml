@@ -1,0 +1,19 @@
+name: lifo
+description: |
+  出庫を LIFO（最新の入庫から出す）にしたシナリオ。
+  LIFO(Last-In-First-Out) と FILO(First-In-Last-Out) は同じ概念で、filo と同一動作。
+  最後に入庫したカードを最初に出すため、古い在庫が奥に滞留しやすい。FIFO(baseline)
+  との比較用。出庫アルゴリズムは LatestFirstOutbound。
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.baseline:LatestFirstOutbound"
+  args: {}
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

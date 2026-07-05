@@ -1,0 +1,18 @@
+name: lilo
+description: |
+  LILO(Last-In-Last-Out) は FIFO と同じ概念で、最古の入庫から出す。
+  fifo のエイリアス（同一動作）。呼称を揃えるために用意。
+  出庫アルゴリズムは OldestFirstOutbound。
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.baseline:OldestFirstOutbound"
+  args: {}
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

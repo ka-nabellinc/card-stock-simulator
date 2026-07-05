@@ -96,6 +96,45 @@ class OldestFirstOutbound(OutboundAlgorithm):
         return assignments
 
 
+class LatestFirstOutbound(OutboundAlgorithm):
+    """最新の入庫日のカードから優先的に出庫する（LIFO / FILO）。
+
+    LIFO(Last-In-First-Out) と FILO(First-In-Last-Out) は同じ概念で、最後に入庫した
+    カードを最初に出す。OldestFirstOutbound(FIFO / LILO) のちょうど逆。入庫日を持たない
+    初期在庫は最古扱い（最後に出庫）とする。
+    """
+
+    def select(
+        self,
+        orders: list[Order],
+        storages: dict[str, StorageState],
+    ) -> list[tuple[Order, str]]:
+        assignments: list[tuple[Order, str]] = []
+
+        # 全カードを入庫日降順（新しい順）で並べる。
+        # 安定ソートを利用し、同一入庫日は card_id 昇順で決定的にする。
+        all_cards: list[CardInfo] = []
+        for storage in storages.values():
+            all_cards.extend(storage.cards)
+        all_cards.sort(key=lambda c: c.card_id)
+        all_cards.sort(key=lambda c: (c.arrival_date or date.min), reverse=True)
+
+        assigned: set[str] = set()
+        for order in orders:
+            needed = order.quantity
+            for card in all_cards:
+                if needed == 0:
+                    break
+                if card.card_id in assigned:
+                    continue
+                if card.product_id == order.product_id and card.rank == order.rank:
+                    assignments.append((order, card.card_id))
+                    assigned.add(card.card_id)
+                    needed -= 1
+
+        return assignments
+
+
 class SmallestStorageFirstOutbound(OutboundAlgorithm):
     """ストレージIDが小さい順にカードを選んで出庫する。"""
 

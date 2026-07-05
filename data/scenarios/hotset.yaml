@@ -1,0 +1,33 @@
+name: hotset
+description: |
+  売れ筋集約を正しく噛み合わせたシナリオ。
+  入庫は1〜10番を予約(Top100Reserved)、棚卸しで直近30日の売れ筋TOP100種を
+  1〜10番へ4枚ずつ集約(Top100Weekly)、出庫は集約(consolidated)で少数・低在庫の
+  箱に寄せる。
+  既存 top100_stocktake が出庫をID昇順(SmallestStorageFirst)にして噛み合って
+  いなかった点を集約出庫に差し替え、棚卸しの移動枚数も cards_per_type=4 に絞って
+  週次の移動コストを抑える。
+  検証結果(202606): 55.9h / あたり率2.0%。consolidated(49.0h/2.0%)に工数で劣り
+  あたり率も同等。週次棚卸しの移動コストが集約メリットを上回った反証データ。
+inbound:
+  class: "sim.algorithms.stocktake:Top100ReservedInbound"
+  args:
+    reserved_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+outbound:
+  class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
+  args:
+    pick_per_storage_sec: 58.49
+    per_card_sec: 0.2
+stocktake:
+  class: "sim.algorithms.stocktake:Top100WeeklyStocktake"
+  args:
+    top_n: 100
+    cards_per_type: 4
+    lookback_days: 30
+    weekday: 0
+    target_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    move_per_card_sec: 30.0
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

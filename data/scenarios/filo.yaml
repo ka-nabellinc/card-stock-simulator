@@ -1,0 +1,18 @@
+name: filo
+description: |
+  FILO(First-In-Last-Out) は LIFO と同じ概念で、最新の入庫から出す。
+  lifo のエイリアス（同一動作）。呼称を揃えるために用意。
+  出庫アルゴリズムは LatestFirstOutbound。
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.baseline:LatestFirstOutbound"
+  args: {}
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

@@ -1,0 +1,22 @@
+name: lowinv
+description: |
+  在庫数の少ない箱から優先して開けて出庫するシナリオ。
+  あたり率（出庫枚数 ÷ 触れた箱の在庫総数）の分母を直接小さくする狙い。
+  集約(consolidated)がコスト効率で箱を選ぶのに対し、純粋に低在庫箱を優先する
+  あたり率特化の対照アルゴリズム。入庫・棚卸しは baseline と同じ。
+  検証結果(202606): 72.2h / あたり率1.4%。狙いは外れ、consolidated(49.0h/2.0%)に
+  工数・あたり率とも劣る。低在庫箱を優先するとカバー枚数を無視して触れる箱数が
+  増えるための反証データ。
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.lowinv:LowInventoryFirstOutbound"
+  args: {}
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

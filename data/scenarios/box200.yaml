@@ -1,0 +1,24 @@
+name: box200
+description: |
+  consolidated と同じアルゴリズムのまま、箱を「1箱200枚 × 500箱」に上書きした
+  箱サイズ感度分析（容量 100,000枚）。
+  smallbox(100枚)とbox300(300枚)の中間で、あたり率の向上と総工数の悪化の
+  スイートスポットを探る。
+storages:
+  count: 500
+  capacity: 200
+inbound:
+  class: "sim.algorithms.baseline:FillEmptyStorageInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
+  args:
+    pick_per_storage_sec: 58.49
+    per_card_sec: 0.2
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

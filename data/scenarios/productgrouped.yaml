@@ -1,0 +1,23 @@
+name: productgrouped
+description: |
+  同じ商品(product_id)をランク問わず同じ箱へ寄せる中間集約入庫のシナリオ。
+  grouped(商品×ランクで完全集約)は入庫工数が爆発したが、こちらは商品単位に緩めて
+  ホーム箱数を減らし、入庫工数の増分を抑えつつあたり率を稼げるかを見る。
+  出庫は集約(consolidated)。FillEmpty(consolidated) と grouped の中間。
+  検証結果(202606): 96.0h / あたり率1.9%。grouped 同様に入庫工数が爆発し
+  consolidated(49.0h/2.0%)の約2倍。集約入庫はこのデータでは非効率という反証データ。
+inbound:
+  class: "sim.algorithms.product_grouped:ProductGroupedInbound"
+  args: {}
+outbound:
+  class: "sim.algorithms.consolidated:ConsolidatedStorageOutbound"
+  args:
+    pick_per_storage_sec: 58.49
+    per_card_sec: 0.2
+stocktake:
+  class: "sim.algorithms.baseline:NoStocktake"
+  args: {}
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2

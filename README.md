@@ -122,7 +122,7 @@ uv run python -m sim.web_run --data-dir ./data --port 8080 --debug
 
 ---
 
-## 同梱アルゴリズム（`sim/algorithms/baseline.py`）
+## 同梱アルゴリズム（`sim/algorithms/`）
 
 | クラス | 種別 | 動作 |
 |---|---|---|
@@ -132,6 +132,9 @@ uv run python -m sim.web_run --data-dir ./data --port 8080 --debug
 | `ConsolidatedStorageOutbound` | 出庫 | 1日の注文をできるだけ少数・低在庫のストレージにまとめて出庫する（貪欲な重み付き集合被覆）。触れる箱数と箱の在庫課金を減らし、あたり率も上げる |
 | `GroupByProductInbound` | 入庫 | 同じ商品・ランクをできるだけ同じ箱（ホーム箱）に寄せて入庫する。あたり率の最適解を検証する用途。実運用では入庫時の仕分け手間が増える |
 | `ScatterInbound` | 入庫 | 同じ商品・ランクをできるだけ別々の箱へ分散（エントロピー最大化）して入庫する。集約の真逆を検証する用途 |
+| `LatestFirstOutbound` | 出庫 | 入庫日が新しいカードから選ぶ（LIFO / FILO）。`OldestFirstOutbound`(FIFO) の逆 |
+| `ProductGroupedInbound` | 入庫 | 同じ商品(product_id)をランク問わず同じ箱へ寄せる中間集約。`GroupByProductInbound` と `FillEmptyStorageInbound` の中間。検証では入庫工数が増え非効率だった |
+| `LowInventoryFirstOutbound` | 出庫 | 在庫の少ない箱から優先して開ける「あたり率特化」の対照。検証では `ConsolidatedStorageOutbound` に工数・あたり率とも劣った |
 | `NoStocktake` | 棚卸し | 何もしない（常に移動なし・コスト0） |
 
 ## 同梱シナリオ（`data/scenarios/`）
@@ -145,8 +148,29 @@ uv run python -m sim.web_run --data-dir ./data --port 8080 --debug
 | `scattered` | `ScatterInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
 | `smallbox` | `FillEmptyStorageInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
 | `box300` | `FillEmptyStorageInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+| `box200` | `FillEmptyStorageInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+| `box150` | `FillEmptyStorageInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+| `hybrid` | `FillEmptyStorageInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+| `fifo` / `lilo` | `FillEmptyStorageInbound` | `OldestFirstOutbound` | `NoStocktake` |
+| `lifo` / `filo` | `FillEmptyStorageInbound` | `LatestFirstOutbound` | `NoStocktake` |
+| `lowinv` | `FillEmptyStorageInbound` | `LowInventoryFirstOutbound` | `NoStocktake` |
+| `productgrouped` | `ProductGroupedInbound` | `ConsolidatedStorageOutbound` | `NoStocktake` |
+| `hotset` | `Top100ReservedInbound` | `ConsolidatedStorageOutbound` | `Top100WeeklyStocktake` |
 
-`smallbox`（1箱100枚×1000箱）と `box300`（1箱300枚×334箱）は、`consolidated` と同じアルゴリズムのままストレージ定義だけを上書きして箱サイズの影響を見る実験用シナリオです（後述「ストレージ定義の上書き」）。いずれも総容量を約100,000枚に揃えてあります。
+`smallbox`（1箱100枚×1000箱）・`box300`（300枚×334箱）・`box200`（200枚×500箱）・`box150`（150枚×667箱）は、`consolidated` と同じアルゴリズムのままストレージ定義だけを上書きして箱サイズの影響を見る実験用シナリオです（後述「ストレージ定義の上書き」）。いずれも総容量を約100,000枚に揃えてあります。`hybrid` は小箱100枚×500 + 大箱1000枚×50 の混在構成（`storages_hybrid.csv`）。
+
+`fifo`/`lilo` は同一動作（FIFO=LILO=最古出庫）、`lifo`/`filo` も同一動作（LIFO=FILO=最新出庫）の呼称エイリアスです。`lowinv`・`productgrouped`・`hotset` は `consolidated` を超えられなかった対照シナリオで、各 YAML の description に検証結果を記載しています。
+
+### 箱サイズ × コスト感度分析ツール
+
+箱開け固定費（`outbound_pick_per_storage_sec`）を振って、総工数が最小になる箱サイズを探すツールを同梱しています。
+
+```bash
+uv run python -m tools.box_size_cost_sensitivity 202606
+uv run python -m tools.box_size_cost_sensitivity fullhistory
+```
+
+箱開け費を下げるほど最適な箱サイズが小さくなり、その逆転点は在庫の充填率に依存します（満杯運用ほど大箱が有利）。
 
 ## シナリオの追加方法
 
