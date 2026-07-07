@@ -20,6 +20,124 @@ def _load_order_csv(path: str) -> list[tuple[date, str, str, int]]:
     return records
 
 
+def _load_expansion_map(path: str) -> dict[str, str]:
+    """外部注文CSVから product_id → エキスパンションマーク のマッピングを作る。"""
+    mapping: dict[str, str] = {}
+    with open(path, encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            mapping[row["商品ID"]] = row["エキスパンションマーク"]
+    return mapping
+
+
+class ExpansionGroupInbound(InboundAlgorithm):
+    """同じエキスパンションのカードを同じストレージにまとめる入庫アルゴリズム。
+
+    - 1ストレージあたり最大 max_types 種類（product_id+rank の組み合わせ）まで
+    - 同じエキスパンションで空きがある箱があればそこへ入れる
+    - なければ新しい箱を開ける
+    - エキスパンション不明のカードは通常の FillEmptyStorage と同じ扱い
+    """
+
+    def __init__(
+        self,
+        order_csv: str,
+        max_types: int = 10,
+        **kwargs,
+    ):
+        self.expansion_map = _load_expansion_map(order_csv)
+        self.max_types = max_types
+
+    def assign(
+        self,
+        cards: list[CardInfo],
+        storages: dict[str, StorageState],
+    ) -> list[tuple[str, str]]:
+        def _id_key(sid: str):
+            return (0, int(sid)) if sid.isdigit() else (1, sid)
+
+        # 既存ストレージのエキスパンション・種類数を把握
+        # expansion -> [(storage_id, types_count, available), ...]
+        exp_storages: dict[str, list[tuple[str, int, int]]] = defaultdict(list)
+        for sid, storage in storages.items():
+            if storage.available == 0:
+                continue
+            exp_set: set[tuple[str, str]] = set()
+            exp_marks: set[str] = set()
+            for card in storage.cards:
+                exp = self.expansion_map.get(card.product_id, "")
+                exp_marks.add(exp)
+                exp_set.add((card.product_id, card.rank))
+            # 単一エキスパンションのストレージのみ対象（空箱も含む）
+            if len(exp_marks) <= 1:
+                exp = next(iter(exp_marks)) if exp_marks else ""
+                exp_storages[exp].append((sid, len(exp_set), storage.available))
+
+        # エキスパンションごとに空き状況をソート（種類数が多い順→ID順）
+        for exp in exp_storages:
+            exp_storages[exp].sort(key=lambda x: (-x[1], _id_key(x[0])))
+
+        # 現在の割り当てを追跡（ストレージごとの追加種類と枚数）
+        assign_types: dict[str, set[tuple[str, str]]] = defaultdict(set)
+        assign_counts: dict[str, int] = defaultdict(int)
+
+        assignments: list[tuple[str, str]] = []
+
+        # 空き箱（エキスパンション未割当）を用意
+        empty_storages = sorted(
+            [sid for sid, s in storages.items() if s.count == 0 and s.available > 0],
+            key=_id_key,
+        )
+        empty_iter = iter(empty_storages)
+
+        def _find_dest(exp: str, card_type: tuple[str, str]) -> str | None:
+            """割り当て先ストレージを探す。なければ空き箱を開ける。"""
+            # 同エキスパンションの既存ストレージを探す
+            for entry in exp_storages.get(exp, []):
+                sid, existing_types, avail = entry
+                current_types = assign_types[sid] | {card_type}
+                total_types = existing_types + len(assign_types[sid] - {card_type})
+                if total_types + (1 if card_type not in assign_types[sid] else 0) <= self.max_types:
+                    if avail - assign_counts[sid] > 0:
+                        return sid
+            # 同エキスパンションの割り当て済み（今回新規）ストレージを探す
+            # → assign_types に登録された同エキスパンションの箱
+            for sid, types_set in assign_types.items():
+                if sid in storages:
+                    first_pid = next(iter(types_set))[0] if types_set else None
+                    sid_exp = self.expansion_map.get(first_pid, "") if first_pid else exp
+                    if sid_exp == exp:
+                        total_types_count = len(types_set | {card_type})
+                        if total_types_count <= self.max_types:
+                            used = assign_counts[sid]
+                            cap = storages[sid].available
+                            if cap - used > 0:
+                                return sid
+            # 新しい空き箱を開ける
+            try:
+                return next(empty_iter)
+            except StopIteration:
+                return None
+
+        for card in cards:
+            exp = self.expansion_map.get(card.product_id, "UNKNOWN")
+            card_type = (card.product_id, card.rank)
+            dest = _find_dest(exp, card_type)
+            if dest is None:
+                # 空き箱なし → 空きがある任意のストレージへフォールバック
+                dest = next(
+                    (sid for sid, s in sorted(storages.items(), key=lambda x: _id_key(x[0]))
+                     if s.available - assign_counts[sid] > 0),
+                    None,
+                )
+            if dest is None:
+                raise RuntimeError(f"入庫できるストレージがありません: {card.card_id}")
+            assignments.append((card.card_id, dest))
+            assign_types[dest].add(card_type)
+            assign_counts[dest] += 1
+
+        return assignments
+
+
 class ForecastWeeklyStocktake(StocktakeAlgorithm):
     """需要予測に基づいて売れ筋を1〜10番に集める週次棚卸し。
 

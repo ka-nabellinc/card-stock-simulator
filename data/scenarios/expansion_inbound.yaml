@@ -1,0 +1,26 @@
+name: expansion_inbound
+description: |
+  同じエキスパンションのカードを同じストレージに最大10種類までまとめて入庫するシナリオ。
+  エキスパンション単位で箱を分けることで、出庫時に目的のカードが見つかりやすくなる仮説を検証する。
+  棚卸しと出庫は forecast_stocktake と同じ（需要予測＋優先ストレージ出庫）。
+inbound:
+  class: "sim.algorithms.forecast:ExpansionGroupInbound"
+  args:
+    order_csv: "data/external/orders_history.csv"
+    max_types: 10
+outbound:
+  class: "sim.algorithms.forecast:PriorityStorageOutbound"
+  args:
+    priority_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+stocktake:
+  class: "sim.algorithms.forecast:ForecastWeeklyStocktake"
+  args:
+    order_csv: "data/external/orders_history.csv"
+    target_storages: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    weekday: 0
+    capacity_per_type: 40
+    move_per_card_sec: 30.0
+costs:
+  inbound_per_storage_sec: 30
+  outbound_pick_per_storage_sec: 58.49
+  outbound_per_card_sec: 0.2
