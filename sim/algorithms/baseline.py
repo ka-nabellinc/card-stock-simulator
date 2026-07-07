@@ -75,23 +75,28 @@ class OldestFirstOutbound(OutboundAlgorithm):
     ) -> list[tuple[Order, str]]:
         assignments: list[tuple[Order, str]] = []
 
-        # 全カードを入庫日昇順で並べる
+        # 全カードを入庫日昇順で並べ、(product_id, rank) ごとに引けるよう索引化する。
+        # 注文ごとに全在庫を走査せず該当商品のカードだけを見るための最適化で、
+        # 選択順（入庫日→card_id 昇順）は全件走査と同一。
         all_cards: list[CardInfo] = []
         for storage in storages.values():
             all_cards.extend(storage.cards)
         all_cards.sort(key=lambda c: (c.arrival_date or date.min, c.card_id))
 
+        by_key: dict[tuple[str, str], list[str]] = {}
+        for card in all_cards:
+            by_key.setdefault((card.product_id, card.rank), []).append(card.card_id)
+
+        assigned: set[str] = set()
         for order in orders:
             needed = order.quantity
-            for card in all_cards:
+            for card_id in by_key.get((order.product_id, order.rank), ()):
                 if needed == 0:
                     break
-                if card.product_id == order.product_id and card.rank == order.rank:
-                    # まだ割り当てられていないか確認
-                    already_assigned = any(c == card.card_id for _, c in assignments)
-                    if not already_assigned:
-                        assignments.append((order, card.card_id))
-                        needed -= 1
+                if card_id not in assigned:
+                    assignments.append((order, card_id))
+                    assigned.add(card_id)
+                    needed -= 1
 
         return assignments
 
@@ -107,26 +112,26 @@ class SmallestStorageFirstOutbound(OutboundAlgorithm):
         def _storage_key(sid: str):
             return int(sid) if sid.isdigit() else sid
 
-        # ストレージID昇順に全カードを並べる
+        # ストレージID昇順に全カードを並べ、(product_id, rank) ごとに索引化する。
+        # 注文ごとに全在庫を走査せず該当商品のカードだけを見るための最適化で、
+        # 選択順（ストレージID昇順→格納順）は全件走査と同一。
         sorted_storages = sorted(storages.values(), key=lambda s: _storage_key(s.storage_id))
-        all_cards: list[tuple[str, CardInfo]] = []
+        by_key: dict[tuple[str, str], list[str]] = {}
         for storage in sorted_storages:
             for card in storage.cards:
-                all_cards.append((storage.storage_id, card))
+                by_key.setdefault((card.product_id, card.rank), []).append(card.card_id)
 
         assigned: set[str] = set()
         assignments: list[tuple[Order, str]] = []
 
         for order in orders:
             needed = order.quantity
-            for _sid, card in all_cards:
+            for card_id in by_key.get((order.product_id, order.rank), ()):
                 if needed == 0:
                     break
-                if card.card_id in assigned:
-                    continue
-                if card.product_id == order.product_id and card.rank == order.rank:
-                    assignments.append((order, card.card_id))
-                    assigned.add(card.card_id)
+                if card_id not in assigned:
+                    assignments.append((order, card_id))
+                    assigned.add(card_id)
                     needed -= 1
 
         return assignments
