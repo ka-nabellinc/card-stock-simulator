@@ -90,6 +90,8 @@
         <td>
           {% if summary_headers[loop.index0] == 'hit_rate' and cell != '' %}
             {{ "%.1f"|format(cell|float * 100) }}%
+          {% elif summary_headers[loop.index0].endswith('_cost_sec') and cell != '' %}
+            {{ cell | fmt_sec }}
           {% else %}
             {{ cell }}
           {% endif %}

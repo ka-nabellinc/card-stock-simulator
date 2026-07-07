@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 from sim.engine import run_simulation
+from sim.format import humanize_seconds
 from sim.io.reader import (
     generate_storages,
     load_inbound,
@@ -129,7 +130,8 @@ def main() -> None:
     print(f"データセット: {args.dataset}")
     print(f"シナリオ: {args.scenario}")
     print(f"期間: {logs[0].date} 〜 {logs[-1].date} ({len(logs)} 日間)")
-    print(f"総工数: {total_cost:.1f} 秒 ({total_cost/3600:.2f} 時間)")
+    human = humanize_seconds(total_cost)
+    print(f"総工数: {total_cost:.1f} 秒" + (f" ({human})" if human else ""))
     print(f"入庫カード数: {total_inbound} 枚")
     print(f"出庫カード数: {total_outbound} 枚")
     if avg_hit_rate is not None:

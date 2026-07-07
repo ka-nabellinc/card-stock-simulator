@@ -9,7 +9,20 @@ from pathlib import Path
 import yaml
 from flask import Flask, abort, jsonify, render_template, request
 
+from sim.format import humanize_seconds
+
 app = Flask(__name__)
+
+
+@app.template_filter("fmt_sec")
+def fmt_sec_filter(value) -> str:
+    """秒数のセル値に、大きい値なら「X分Y秒」「X時間Y分」を併記する。"""
+    try:
+        sec = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    human = humanize_seconds(sec)
+    return f"{value} ({human})" if human else str(value)
 
 
 def _get_data_dir() -> Path:
